@@ -1,3 +1,5 @@
 streamlit
-pandas
-plotly
+# 如果未來有用到其他套件（例如處理 Excel 或 圖片），請在下方新增：
+# pandas
+# openpyxl
+# Pillow
