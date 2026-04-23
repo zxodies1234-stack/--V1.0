@@ -22,7 +22,7 @@ st.markdown("""
 project_dir = f"projects/{curr_proj}"
 path_review = os.path.join(project_dir, "review_items_process.csv")
 path_cert = os.path.join(project_dir, "review_items_final.csv")
-path_notes = os.path.join(project_dir, "notes_reward.json") # 獎勵項目專屬便利貼
+path_notes = os.path.join(project_dir, "notes_reward.json") 
 
 if not os.path.exists(project_dir):
     os.makedirs(project_dir, exist_ok=True)
@@ -31,70 +31,78 @@ st.title("📝 申請獎勵項目-候選 / 標章")
 st.caption(f"當前專案：{curr_proj}")
 st.divider()
 
-# --- 🟢 1. 頂部快速確認 (保持你的原稿邏輯) ---
-st.subheader("✅ 階段證書/標章取得快報")
-col_check1, col_check2, col_check3 = st.columns(3)
-with col_check1:
-    st.checkbox("綠建築候選/標章", key="chk_gb")
-with col_check2:
-    st.checkbox("智慧建築候選/標章", key="chk_ib")
-with col_check3:
-    st.checkbox("耐震設計/標章", key="chk_seismic")
-
-st.divider()
-
 # --- 2. 資料載入函數 ---
 def load_reward_data(path, is_table_2=False):
-    cols = ["審查項目", "列管時間", "進度", "協力單位", "備註"]
+    cols = ["評估項目", "是否辦理", "進度狀態", "列管時間", "審查單位", "協力單位", "備註"]
+    
     if os.path.exists(path):
-        return pd.read_csv(path, dtype=str).fillna("")
+        df = pd.read_csv(path, dtype=str).fillna("")
+        for c in cols:
+            if c not in df.columns:
+                if c == "是否辦理": df[c] = "⚪ 待確認"
+                elif c == "進度狀態": df[c] = "⚪ 未開始"
+                else: df[c] = ""
+        return df[cols]
     else:
         if not is_table_2:
             data = [
-                {"審查項目": "耐震設計審查", "列管時間": "放樣勘驗前"},
-                {"審查項目": "無障礙性能評估", "列管時間": "1F樓板勘驗前"},
-                {"審查項目": "結構安全性能審查", "列管時間": "放樣勘驗前"},
-                {"審查項目": "綠建築候選", "列管時間": "1F樓板勘驗前"},
-                {"審查項目": "智慧建築候選", "列管時間": "1F樓板勘驗前"}
+                {"評估項目": "耐震設計審查", "列管時間": "放樣勘驗前"},
+                {"評估項目": "無障礙性能評估", "列管時間": "1F樓板勘驗前"},
+                {"評估項目": "結構安全性能審查", "列管時間": "放樣勘驗前"},
+                {"評估項目": "綠建築候選", "列管時間": "1F樓板勘驗前"},
+                {"評估項目": "智慧建築候選", "列管時間": "1F樓板勘驗前"},
+                {"評估項目": "1+級能效候選", "列管時間": "1F樓板勘驗前"},
+                {"評估項目": "綠建築自治條例專章", "列管時間": "1F樓板勘驗前"}
             ]
         else:
             data = [
-                {"審查項目": "耐震設計標章", "列管時間": "使照前"},
-                {"審查項目": "無障礙性能標章", "列管時間": "使照後3個月"},
-                {"審查項目": "結構安全性能標章", "列管時間": "使照後3個月"},
-                {"審查項目": "綠建築標章", "列管時間": "使照後2年內"},
-                {"審查項目": "智慧建築標章", "列管時間": "使照後2年內"}
+                {"評估項目": "耐震設計標章", "列管時間": "使照前"},
+                {"評估項目": "無障礙性能標章", "列管時間": "使照後3個月"},
+                {"評估項目": "結構安全性能標章", "列管時間": "使照後3個月"},
+                {"評估項目": "綠建築標章", "列管時間": "使照後2年內"},
+                {"評估項目": "智慧建築標章", "列管時間": "使照後2年內"},
+                {"評估項目": "1+級能效標章", "列管時間": "使照後2年內"}
             ]
-        df = pd.DataFrame(data, columns=cols).fillna("")
-        df["進度"] = "⚪ 未開始"
-        return df
+        df = pd.DataFrame(data)
+        df["是否辦理"] = "⚪ 待確認"
+        df["進度狀態"] = "⚪ 未開始"
+        df["審查單位"] = ""
+        df["協力單位"] = ""
+        df["備註"] = ""
+        return df[cols]
 
 df_r1 = load_reward_data(path_review, False)
 df_r2 = load_reward_data(path_cert, True)
 
-status_options = ["⚪ 未開始", "📂 彙整中", "📨 掛號中", "📝 補正中", "✅ 已完成", "⚠️ 遇到問題", "➖ 未涉及"]
+# 選單內容
+opt_handle = ["⚪ 待確認", "✅ 需辦理", "➖ 不涉及"]
+opt_status = ["⚪ 未開始", "⏳ 辦理中", "📝 補正中", "🆗 已結案", "⚠️ 遇到問題"]
+
 column_config = {
-    "審查項目": st.column_config.TextColumn("審查項目", width="medium"),
+    "評估項目": st.column_config.TextColumn("評估項目", width="medium"),
+    "是否辦理": st.column_config.SelectboxColumn("是否辦理", options=opt_handle, width="small"),
+    "進度狀態": st.column_config.SelectboxColumn("進度狀態", options=opt_status, width="small"),
     "列管時間": st.column_config.TextColumn("列管時間", width="small"),
-    "進度": st.column_config.SelectboxColumn("進度", options=status_options, width="small"),
+    "審查單位": st.column_config.TextColumn("審查單位", width="small"),
+    "協力單位": st.column_config.TextColumn("協力單位", width="small"),
     "備註": st.column_config.TextColumn("備註", width="large")
 }
 
-# --- 3. 表格渲染 (自動高度) ---
-st.subheader("🏆 表格 1：獎勵項目-審查與候選")
+# --- 3. 表格渲染 ---
+st.subheader("🏆 審查與候選：勘驗前後")
 h1 = (len(df_r1) * 35.5) + 48
 with st.form("form_t1"):
     e_t1 = st.data_editor(df_r1, num_rows="dynamic", use_container_width=True, hide_index=True, height=int(h1), column_config=column_config)
-    if st.form_submit_button("💾 儲存表格 1 變更", use_container_width=True):
+    if st.form_submit_button("💾 儲存審查與候選變更", use_container_width=True):
         e_t1.to_csv(path_review, index=False, encoding='utf-8-sig'); st.rerun()
 
 st.write("")
 
-st.subheader("🏅 表格 2：獎勵項目-取得標章")
+st.subheader("🏅 取得標章：使照前後")
 h2 = (len(df_r2) * 35.5) + 48
 with st.form("form_t2"):
     e_t2 = st.data_editor(df_r2, num_rows="dynamic", use_container_width=True, hide_index=True, height=int(h2), column_config=column_config)
-    if st.form_submit_button("💾 儲存表格 2 變更", use_container_width=True):
+    if st.form_submit_button("💾 儲存取得標章變更", use_container_width=True):
         e_t2.to_csv(path_cert, index=False, encoding='utf-8-sig'); st.rerun()
 
 # --- 4. 獎勵項目專屬便利貼 ---

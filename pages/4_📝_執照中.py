@@ -14,11 +14,7 @@ st.markdown("""
         .main .block-container { padding-top: 2rem !important; }
         .main .block-container h1 { padding-bottom: 0rem !important; margin-bottom: -0.5rem !important; }
         hr { margin-top: 0.8rem !important; margin-bottom: 1.5rem !important; }
-        
-        /* 移除表格周圍多餘的 padding，讓寬度最大化 */
         [data-testid="stForm"] { padding: 0.5rem 0rem !important; border: none !important; }
-        
-        /* 讓文字編輯器內的滾動軸盡量隱藏 (如果計算精確就不會出現) */
         [data-testid="stTable"] { overflow: hidden !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -26,7 +22,7 @@ st.markdown("""
 # 2. 路徑設定
 project_dir = f"projects/{curr_proj}"
 path_checklist = os.path.join(project_dir, "process_checklist_mid.csv")
-path_notes = os.path.join(project_dir, "notes_mid.json")
+path_notes = os.path.join(project_dir, "notes_mid.json") 
 
 if not os.path.exists(project_dir):
     os.makedirs(project_dir, exist_ok=True)
@@ -39,18 +35,28 @@ st.divider()
 # --- 3. 資料處理邏輯 ---
 
 def load_checklist():
+    # 更新後的標準欄位順序
+    cols = ["評估項目", "是否辦理", "進度狀態", "審查單位", "協力廠商", "備註"]
+    
     if os.path.exists(path_checklist):
         df = pd.read_csv(path_checklist, dtype=str).fillna("")
-        return df
+        # 自動檢查並補齊新欄位 (審查單位、協力廠商)
+        for c in cols:
+            if c not in df.columns:
+                if c == "是否辦理": df[c] = "⚪ 待確認"
+                elif c == "進度狀態": df[c] = "⚪ 未開始"
+                else: df[c] = ""
+        return df[cols]
     else:
-        return pd.DataFrame({
-            "評估項目": [
-                "台電預審", "鑽探報告", "現況測量", "容積移轉", "文資審查", 
-                "鑑界(建築線與地界線相符)", "消防審查", "廢巷改道", "拆照", 
-                "疑似礦區會辦", "樹木保護審查", "山坡地涉及水保計畫", "原容積審查", "畸零地檢討"
-            ], 
-            "是否辦理": "⚪ 待確認", "進度狀態": "⚪ 未開始", "備註": ""
-        })
+        # 預設執照中項目
+        items = ["消防審查", "交通影響評估", "結構外審", "施工說明會", "開工申報"]
+        df = pd.DataFrame({"評估項目": items})
+        df["是否辦理"] = "⚪ 待確認"
+        df["進度狀態"] = "⚪ 未開始"
+        df["審查單位"] = ""
+        df["協力廠商"] = ""
+        df["備註"] = ""
+        return df[cols]
 
 def load_notes():
     if not os.path.exists(path_notes):
@@ -79,14 +85,13 @@ with col_stat2:
 
 st.divider()
 
-# --- 5. 核心：Check List 表格 (移除滾動軸修正) ---
+# --- 5. 核心：Check List 表格 ---
 st.subheader("🔍 執照審查階段 Check List")
 
 opt_handle = ["⚪ 待確認", "✅ 需辦理", "➖ 不涉及"]
 opt_status = ["⚪ 未開始", "⏳ 辦理中", "📝 補正中", "🆗 已結案", "⚠️ 遇到問題"]
 
-# --- 關鍵修正：計算不產生滾動軸的高度 ---
-# 每列約 35.5px + 表頭 38px + 底部緩衝與邊框約 10px
+# 動態高度計算 (每列 35.5px + 表頭 48px)
 dynamic_height = (len(df_mid) * 35.5) + 48 
 
 with st.form("form_checklist_mid"):
@@ -95,17 +100,19 @@ with st.form("form_checklist_mid"):
         use_container_width=True, 
         hide_index=True, 
         num_rows="dynamic", 
-        height=int(dynamic_height), # 強制設定計算後的高度
+        height=int(dynamic_height),
         column_config={
             "評估項目": st.column_config.TextColumn("評估項目", width="medium"),
             "是否辦理": st.column_config.SelectboxColumn("是否辦理", options=opt_handle, width="small"),
             "進度狀態": st.column_config.SelectboxColumn("進度狀態", options=opt_status, width="small"),
+            "審查單位": st.column_config.TextColumn("審查單位", width="small"),
+            "協力廠商": st.column_config.TextColumn("協力廠商", width="small"),
             "備註": st.column_config.TextColumn("備註", width="large")
         }
     )
     if st.form_submit_button("💾 儲存 Check List 變更", use_container_width=True):
         e_mid.to_csv(path_checklist, index=False, encoding='utf-8-sig')
-        st.success("✨ Check List 已儲存！")
+        st.success("✨ 執照中 Check List 已儲存！")
         st.rerun()
 
 # --- 6. 核心：執照中專屬便利貼 ---
@@ -137,5 +144,5 @@ for idx, note in enumerate(st.session_state.temp_notes_mid):
 if st.button("💾 儲存便利貼內容", use_container_width=True):
     save_notes(updated_notes)
     st.session_state.temp_notes_mid = updated_notes
-    st.success("✅ 便利貼已更新！")
+    st.success("✅ 執照中專屬便利貼已更新！")
     st.rerun()

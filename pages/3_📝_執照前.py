@@ -1,84 +1,152 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import date
+import json
 from utils import init_sidebar
 
-# 基礎配置
+# 1. 基礎配置
 st.set_page_config(page_title="各階段審查：執照前", layout="wide")
 curr_proj = init_sidebar()
 
-# 路徑定位
-current_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.dirname(current_dir)
-project_dir = os.path.join(root_dir, "projects", curr_proj)
-path_checklist = os.path.join(project_dir, "review_checklist.csv")
+# --- 💉 視覺修正：強制隱藏滾動軸感與緊湊佈局 ---
+st.markdown("""
+    <style>
+        .main .block-container { padding-top: 2rem !important; }
+        .main .block-container h1 { padding-bottom: 0rem !important; margin-bottom: -0.5rem !important; }
+        hr { margin-top: 0.8rem !important; margin-bottom: 1.5rem !important; }
+        [data-testid="stForm"] { padding: 0.5rem 0rem !important; border: none !important; }
+        [data-testid="stTable"] { overflow: hidden !important; }
+    </style>
+""", unsafe_allow_html=True)
+
+# 2. 路徑設定
+project_dir = f"projects/{curr_proj}"
+path_checklist = os.path.join(project_dir, "process_checklist_pre.csv")
+path_notes = os.path.join(project_dir, "notes_pre.json") 
 
 if not os.path.exists(project_dir):
     os.makedirs(project_dir, exist_ok=True)
 
-# --- 🎩 驚喜一：頂部視覺看板 ---
+# --- 頁面標題 ---
 st.title("📝 各階段審查：執照前")
-col_info1, col_info2 = st.columns([2, 1])
-
-with col_info1:
-    # 里程碑進度
-    st.subheader("🚀 掛號衝刺進度")
-    # 這裡可以根據 Check List 的結案數量自動計算，我們先給一個示範值
-    progress_val = 65 
-    st.progress(progress_val / 100)
-    st.caption(f"目前執照準備進度：{progress_val}%，距離目標掛照還差最後幾哩路！")
-
-with col_info2:
-    # 倒數計時功能
-    st.subheader("⏰ 目標掛照日")
-    target_date = st.date_input("設定預計掛號日期", date(2026, 6, 30))
-    days_left = (target_date - date.today()).days
-    if days_left > 0:
-        st.metric("倒數天數", f"{days_left} Days", delta="-1 Day", delta_color="inverse")
-    else:
-        st.error("⚠️ 已超過預計掛號日！")
-
+st.caption(f"當前專案：{curr_proj}")
 st.divider()
 
-# --- 📂 驚喜二：執照圖說雲端櫃 (模擬上傳) ---
-with st.expander("📂 執照圖說預檢清單 (點開查看上傳狀態)", expanded=False):
-    st.info("💡 這裡可以讓你預覽目前手邊已彙整的圖說檔案，確保掛號當天不缺件。")
-    files = ["1. 建築執照申請書", "2. 委託書/地主同意書", "3. 面積計算表", "4. 配置圖/各層平面圖", "5. 立面/剖面圖"]
-    for f in files:
-        col_f1, col_f2 = st.columns([3, 1])
-        col_f1.write(f)
-        col_f2.checkbox("已備齊", key=f"file_{f}")
+# --- 3. 資料處理邏輯 ---
+
+def load_checklist():
+    # 定義更新後的欄位順序
+    cols = ["評估項目", "是否辦理", "進度狀態", "審查單位", "協力廠商", "備註"]
     
-    st.file_uploader("📥 上傳圖說草案 (PDF/DWG)", accept_multiple_files=True)
+    if os.path.exists(path_checklist):
+        df = pd.read_csv(path_checklist, dtype=str).fillna("")
+        # 自動檢查並補齊新欄位
+        for c in cols:
+            if c not in df.columns:
+                if c == "是否辦理": df[c] = "⚪ 待確認"
+                elif c == "進度狀態": df[c] = "⚪ 未開始"
+                else: df[c] = ""
+        return df[cols]
+    else:
+        # 預設項目
+        items = [
+            "捷運禁限範圍", "松山機場禁限管制", "海砂審查鑑定", "都審", 
+            "都更", "容移", "危老", "歷史建築", "環境風場試驗", 
+            "都市計畫指定留設：騎樓/騎樓地/無遮簷人行道"
+        ]
+        df = pd.DataFrame({"評估項目": items})
+        df["是否辦理"] = "⚪ 待確認"
+        df["進度狀態"] = "⚪ 未開始"
+        df["審查單位"] = ""
+        df["協力廠商"] = ""
+        df["備註"] = ""
+        return df[cols]
+
+def load_notes():
+    if not os.path.exists(path_notes):
+        return [{"title": "新紀錄", "content": ""}]
+    with open(path_notes, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_notes(notes_list):
+    with open(path_notes, "w", encoding="utf-8") as f:
+        json.dump(notes_list, f, ensure_ascii=False, indent=4)
+
+if 'temp_notes_pre' not in st.session_state or st.session_state.get('notes_pre_last_proj') != curr_proj:
+    st.session_state.temp_notes_pre = load_notes()
+    st.session_state.notes_pre_last_proj = curr_proj
+
+# --- 4. 統計看板 ---
+df_pre = load_checklist()
+status_handle = df_pre["是否辦理"].value_counts()
+status_progress = df_pre["進度狀態"].value_counts()
+
+col_stat1, col_stat2, col_spacer = st.columns([1, 1, 3])
+with col_stat1:
+    st.metric("✅ 需辦理", status_handle.get("✅ 需辦理", 0))
+with col_stat2:
+    st.metric("🆗 已結案", status_progress.get("🆗 已結案", 0))
 
 st.divider()
 
-# --- 🔍 原有的：評估階段 Check List (搬家過來的內容) ---
-check_items = [
-    "捷運禁限範圍", "松山機場禁限管制", "海砂審查鑑定", "都審", "都更", 
-    "容移", "危老", "歷史建築", "環境風場試驗", 
-    "都市計畫指定留設：騎樓/騎樓地/無遮簷人行道"
-]
+# --- 5. 核心：Check List 表格 ---
+st.subheader("🔍 執照審查階段 Check List")
 
-if os.path.exists(path_checklist):
-    df_check = pd.read_csv(path_checklist, dtype=str).fillna("")
-else:
-    df_check = pd.DataFrame({"評估項目": check_items, "確認狀態": "➖ 不涉及", "關鍵說明/結果": ""})
+opt_handle = ["⚪ 待確認", "✅ 需辦理", "➖ 不涉及"]
+opt_status = ["⚪ 未開始", "⏳ 辦理中", "📝 補正中", "🆗 已結案", "⚠️ 遇到問題"]
 
-st.subheader("🔍 評估階段 Check List")
-with st.form("form_checklist_before"):
-    c_status = ["⚪ 待確認", "✅ 需辦理", "➖ 不涉及", "🆗 已結案"]
-    e_check = st.data_editor(
-        df_check, use_container_width=True, hide_index=True, key="ed_c_before_v2",
+# 動態高度計算
+dynamic_height = (len(df_pre) * 35.5) + 48 
+
+with st.form("form_checklist_pre"):
+    e_pre = st.data_editor(
+        df_pre, 
+        use_container_width=True, 
+        hide_index=True, 
+        num_rows="dynamic", 
+        height=int(dynamic_height),
         column_config={
-            "評估項目": st.column_config.TextColumn(disabled=True, width="medium"),
-            "確認狀態": st.column_config.SelectboxColumn(options=c_status, width="small"),
-            "關鍵說明/結果": st.column_config.TextColumn(width="large")
+            "評估項目": st.column_config.TextColumn("評估項目", width="medium"),
+            "是否辦理": st.column_config.SelectboxColumn("是否辦理", options=opt_handle, width="small"),
+            "進度狀態": st.column_config.SelectboxColumn("進度狀態", options=opt_status, width="small"),
+            "審查單位": st.column_config.TextColumn("審查單位", width="small"),
+            "協力廠商": st.column_config.TextColumn("協力廠商", width="small"),
+            "備註": st.column_config.TextColumn("備註", width="large")
         }
     )
-    if st.form_submit_button("💾 儲存所有資料", use_container_width=True):
-        e_check.to_csv(path_checklist, index=False, encoding='utf-8-sig')
-        st.success("✨ 執照前進度與 Check List 已更新！")
-        st.balloons() # 儲存成功噴個彩帶慶祝一下
+    if st.form_submit_button("💾 儲存 Check List 變更", use_container_width=True):
+        e_pre.to_csv(path_checklist, index=False, encoding='utf-8-sig')
+        st.success("✨ 執照前 Check List 已儲存！")
         st.rerun()
+
+# --- 6. 核心：執照前專屬便利貼 ---
+st.divider()
+st.subheader("📌 執照前重要備忘")
+
+col_note_btn1, col_note_btn2 = st.columns([1, 4])
+with col_note_btn1:
+    if st.button("➕ 新增便利貼"):
+        st.session_state.temp_notes_pre.append({"title": "新紀錄", "content": ""})
+        st.rerun()
+
+cols = st.columns(3)
+updated_notes = []
+
+for idx, note in enumerate(st.session_state.temp_notes_pre):
+    with cols[idx % 3]:
+        with st.container(border=True):
+            c1, c2 = st.columns([4, 1])
+            with c1:
+                new_title = st.text_input(f"標題_{idx}", value=note["title"], key=f"title_{idx}_pre", label_visibility="collapsed")
+            with c2:
+                if st.button("🗑️", key=f"del_{idx}_pre"):
+                    st.session_state.temp_notes_pre.pop(idx)
+                    st.rerun()
+            new_content = st.text_area(f"內容_{idx}", value=note["content"], key=f"content_{idx}_pre", height=120, label_visibility="collapsed")
+            updated_notes.append({"title": new_title, "content": new_content})
+
+if st.button("💾 儲存便利貼內容", use_container_width=True):
+    save_notes(updated_notes)
+    st.session_state.temp_notes_pre = updated_notes
+    st.success("✅ 執照前專屬便利貼已更新！")
+    st.rerun()
