@@ -15,10 +15,33 @@ def init_sidebar():
                 st.session_state['expanded_states'][key] = (key == group_key)
         st.switch_page(page_path)
 
-    # 3. 💉 CSS 注入：維持 400 簡潔風格
+    # 3. 💉 CSS 注入：科技感雙排浮水印 (s 尾端對齊修正版)
     st.markdown("""
         <style>
             [data-testid="stSidebarNav"] { display: none !important; }
+            
+            /* --- 科技感雙排浮水印 --- */
+            .stApp::after {
+                content: "洪睿宇建築師事務所 \\A JYH Architects ";
+                position: fixed;
+                bottom: 40px;
+                right: 40px;
+                opacity: 0.4;                  
+                font-size: 24px;               
+                color: #1E293B;                
+                pointer-events: none; 
+                z-index: 999999;
+                font-weight: 500;              
+                text-align: right;             
+                line-height: 1.3;
+                white-space: pre;               
+                font-family: "Inter", "Segoe UI", "Roboto", sans-serif;
+                letter-spacing: 4px;           
+                font-style: normal;            
+                
+                /* 關鍵修正：微調字母結尾的視覺對齊感 */
+                margin-right: -10px; 
+            }
             
             /* 基礎按鈕樣式 */
             [data-testid="stSidebar"] .stButton button {
@@ -75,17 +98,16 @@ def init_sidebar():
     curr_proj = st.sidebar.selectbox("當前執行專案", projects if projects else ["預設專案"], key="sidebar_proj_select")
     st.sidebar.divider()
 
-    # --- 功能導航區塊 ---
+    # --- 功能導覽區塊 ---
     st.sidebar.title("🚀 功能導航")
     
     if 'expanded_states' not in st.session_state:
         st.session_state['expanded_states'] = {"g1": True, "g2": False, "g3": False, "g4": False, "g5": False}
 
-    # 箭頭指示輔助函式 (修正間距對齊)
     def get_label(label, key):
         if st.session_state['active_nav'] == key:
             return f"➤ {label}" 
-        return f"　 {label}" # 使用精確的全形空白
+        return f"　 {label}" 
 
     # 📌 置頂功能
     if st.sidebar.button(get_label("📌 專案便利貼", "nav_memo"), key="nav_memo_btn"):
@@ -102,8 +124,6 @@ def init_sidebar():
     if exp5.button(get_label("📝 執照中", "n4"), key="n4_btn"): navigate_to("pages/4_📝_執照中.py", "n4", "g5")
     if exp5.button(get_label("📝 執照後", "n5"), key="n5_btn"): navigate_to("pages/5_📝_執照後.py", "n5", "g5")
     if exp5.button(get_label("📝 抽查與報備", "n6"), key="n6_btn"): navigate_to("pages/6_📝_抽查與報備.py", "n6", "g5")
-    
-    # 修正點：確保按鈕文字與跳轉路徑檔名一致 (已移除路徑中的「項目」二字)
     if exp5.button(get_label("📝 申請獎勵-候選 / 標章", "n7"), key="n7_btn"): 
         navigate_to("pages/7_📝_申請獎勵-候選 標章.py", "n7", "g5")
 
