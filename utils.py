@@ -15,7 +15,7 @@ def init_sidebar():
                 st.session_state['expanded_states'][key] = (key == group_key)
         st.switch_page(page_path)
 
-    # 3. 💉 CSS 注入：科技感雙排浮水印 (s 尾端對齊修正版)
+    # 3. 💉 CSS 注入：科技感雙排浮水印與按鈕樣式
     st.markdown("""
         <style>
             [data-testid="stSidebarNav"] { display: none !important; }
@@ -27,19 +27,17 @@ def init_sidebar():
                 bottom: 40px;
                 right: 40px;
                 opacity: 0.4;                  
-                font-size: 24px;               
+                font-size: 24px;                
                 color: #1E293B;                
                 pointer-events: none; 
                 z-index: 999999;
                 font-weight: 500;              
                 text-align: right;             
                 line-height: 1.3;
-                white-space: pre;               
+                white-space: pre;                
                 font-family: "Inter", "Segoe UI", "Roboto", sans-serif;
                 letter-spacing: 4px;           
                 font-style: normal;            
-                
-                /* 關鍵修正：微調字母結尾的視覺對齊感 */
                 margin-right: -10px; 
             }
             
@@ -77,25 +75,53 @@ def init_sidebar():
 
     st.sidebar.title("🏢 專案管理")
     
-    # --- 專案管理區塊 ---
+    # --- 專案資料夾邏輯 ---
     if not os.path.exists("projects"): os.makedirs("projects")
+    
+    # --- 解決網頁版跳回預設專案的關鍵處 ---
+    projects = [d for d in os.listdir("projects") if os.path.isdir(os.path.join("projects", d))]
+    if not projects: projects = ["預設專案"]
+
+    # 初始化 Session State 中的選定專案
+    if 'selected_project' not in st.session_state:
+        st.session_state['selected_project'] = projects[0]
+
+    # 新增/刪除專案展開區
     with st.sidebar.expander("➕ 新增/刪除專案", expanded=False):
         new_col1, new_col2 = st.columns([2,1])
         new_proj = new_col1.text_input("新專案", key="add_input", label_visibility="collapsed", placeholder="名稱")
         if new_col2.button("建立", key="create_btn"):
             if new_proj:
                 os.makedirs(f"projects/{new_proj}", exist_ok=True)
+                st.session_state['selected_project'] = new_proj # 建立後自動切換到該專案
                 st.rerun()
         
-        projects = [d for d in os.listdir("projects") if os.path.isdir(os.path.join("projects", d))]
         del_proj = st.selectbox("刪除專案", ["請選擇"] + projects, key="del_select")
         if st.button("❌ 確認永久刪除", key="delete_btn", use_container_width=True):
-            if del_proj != "請選擇":
+            if del_proj != "請選擇" and del_proj != "預設專案":
                 shutil.rmtree(f"projects/{del_proj}")
+                # 刪除後回到清單第一個專案
+                new_list = [d for d in os.listdir("projects") if os.path.isdir(os.path.join("projects", d))]
+                st.session_state['selected_project'] = new_list[0] if new_list else "預設專案"
                 st.rerun()
 
-    projects = [d for d in os.listdir("projects") if os.path.isdir(os.path.join("projects", d))]
-    curr_proj = st.sidebar.selectbox("當前執行專案", projects if projects else ["預設專案"], key="sidebar_proj_select")
+    # --- 專案選擇器 ---
+    # 透過 index 強制將 UI 對準 Session State 存儲的值
+    try:
+        current_index = projects.index(st.session_state['selected_project'])
+    except ValueError:
+        current_index = 0
+
+    curr_proj = st.sidebar.selectbox(
+        "當前執行專案", 
+        projects, 
+        index=current_index,
+        key="sidebar_proj_select_widget"
+    )
+    
+    # 當選單手動改變時，同步回 Session State
+    st.session_state['selected_project'] = curr_proj
+
     st.sidebar.divider()
 
     # --- 功能導覽區塊 ---
@@ -142,4 +168,5 @@ def init_sidebar():
     exp4 = st.sidebar.expander("📂 資源管理", expanded=st.session_state['expanded_states']["g4"])
     if exp4.button(get_label("📞 聯絡人清單", "n13"), key="n13_btn"): navigate_to("pages/13_📞_聯絡人清單.py", "n13", "g4")
 
-    return curr_proj
+    # 最後返回 Session State 存儲的專案名稱，確保全域統一
+    return st.session_state['selected_project']
