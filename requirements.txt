@@ -1,7 +1,6 @@
-streamlit
-pandas
-plotly
-# 處理 Excel 匯入/匯出必備
-openpyxl
-# 如果未來需要處理圖片（如：現場影像紀錄頁面）
-Pillow
+streamlit==1.56.0
+pandas==3.0.2
+plotly==6.6.0
+openpyxl==3.1.2
+pillow==12.2.0
+reportlab==4.5.0

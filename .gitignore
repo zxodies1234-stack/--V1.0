@@ -1,0 +1,27 @@
+# === Python 執行緩存 ===
+__pycache__/
+*.py[cod]
+*$py.class
+
+# === Streamlit 內部設定與狀態 ===
+.streamlit/
+
+# === 虛擬環境 ===
+.venv/
+venv/
+env/
+
+# === 數據安全與大型檔案 (核心修正) ===
+# 忽略整個專案數據目錄
+projects/
+# 額外確保不錄入大型媒體或文件
+*.csv
+*.pdf
+*.jpg
+*.jpeg
+*.png
+*.mp4
+
+# === 作業系統暫存檔 ===
+.DS_Store
+Thumbs.db
